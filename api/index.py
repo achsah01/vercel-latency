@@ -6,7 +6,7 @@ import numpy as np
 
 app = FastAPI()
 
-# ✅ Enable CORS for all origins and POST requests
+# ✅ Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -15,9 +15,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load telemetry data once at startup
+# Load and group telemetry data by region
 with open("q-vercel-latency.json", "r") as f:
-    telemetry_data = json.load(f)
+    raw_data = json.load(f)
+
+telemetry_data = {}
+for record in raw_data:
+    region = record["region"]
+    telemetry_data.setdefault(region, []).append(record)
 
 @app.post("/")
 async def check_latency(request: Request):
@@ -33,7 +38,7 @@ async def check_latency(request: Request):
 
         records = telemetry_data[region]
         latencies = [r["latency_ms"] for r in records]
-        uptimes = [r["uptime"] for r in records]
+        uptimes = [r["uptime_pct"] for r in records]
 
         if not latencies:
             continue
@@ -54,5 +59,4 @@ async def check_latency(request: Request):
 
 @app.options("/")
 async def options_handler():
-    # Handle preflight CORS requests
     return JSONResponse(content={"message": "OK"})
